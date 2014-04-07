@@ -8,6 +8,10 @@ import java.util.List;
 import org.eclipse.cdt.managedbuilder.core.IConfiguration;
 import org.eclipse.cdt.managedbuilder.core.IProjectType;
 import org.eclipse.cdt.managedbuilder.core.ManagedBuildManager;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IWorkspace;
+import org.eclipse.core.resources.IWorkspaceRoot;
+import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.jface.preference.IPreferencePageContainer;
 import org.eclipse.jface.resource.ImageDescriptor;
@@ -38,6 +42,10 @@ public class CCPreferencesPage implements IWorkbenchPreferencePage {
 	private Combo toolChainCombo;
 
 	private ArrayList<String> toolChainId;
+
+	private Label configProjectLabel;
+
+	private Combo configProjectCombo;
 
 	private Composite composite;
 
@@ -75,6 +83,18 @@ public class CCPreferencesPage implements IWorkbenchPreferencePage {
 		}
 	}
 
+	private void initializeConfigProjectCombo() {
+		IWorkspace workspace = ResourcesPlugin.getWorkspace();
+		IWorkspaceRoot root = workspace.getRoot();
+		configProjectCombo.add("");
+		for(IProject project : root.getProjects()) {
+			configProjectCombo.add(project.getName());
+			if(project.getName().equals(CCSupportPlugin.getInstance().getConfigProject())) {
+				configProjectCombo.select(configProjectCombo.getItemCount()-1);
+			}
+		}
+	}
+
 	public void createControl(Composite parent) {
 		composite = new Composite(parent, SWT.NONE);
 		composite.setLayout(new GridLayout(1, false));
@@ -97,6 +117,12 @@ public class CCPreferencesPage implements IWorkbenchPreferencePage {
 		toolChainCombo = new Combo(composite, SWT.READ_ONLY | SWT.BORDER);
 		toolChainId = new ArrayList<String>();
 		initializeToolChainCombo();
+
+		configProjectLabel = new Label(composite, SWT.NONE);
+		configProjectLabel.setText("Config from:");
+
+		configProjectCombo = new Combo(composite, SWT.READ_ONLY | SWT.BORDER);
+		initializeConfigProjectCombo();
 	}
 
 	public void dispose() {
@@ -150,10 +176,35 @@ public class CCPreferencesPage implements IWorkbenchPreferencePage {
 		// do nothing
 	}
 
+// FIXME: cleanup at catch
+	private boolean isValidConfigProject(String name) {
+		try {
+			IWorkspace workspace = ResourcesPlugin.getWorkspace();
+			IWorkspaceRoot root = workspace.getRoot();
+			IProject configProject = root.getProject(name);
+			boolean isOpened = true;
+			if(!configProject.isOpen()) {
+				isOpened = false;
+				configProject.open(null);
+			}
+			if(!configProject.isNatureEnabled("org.eclipse.cdt.managedbuilder.core.managedBuildNature")) {
+				if(!isOpened) configProject.close(null);
+				return false;
+			}
+			IConfiguration ics[] = ManagedBuildManager.getBuildInfo(configProject).getManagedProject().getConfigurations();
+			for(IConfiguration ic : ics) {
+				if(ic.getId().startsWith(toolChainId.get(toolChainCombo.getSelectionIndex()))) {
+					return true;
+				}
+			}
+			if(!isOpened) configProject.close(null);
+		} catch (Exception e) {
+			return false;
+		}
+		return false;
+	}
+
 	public boolean performOk() {
-		CCSupportPlugin.getInstance().getPreferenceStore().setValue(
-				CCSupportPlugin.CODE_TEMPLATE_PREFERENCE,
-				codeTemplateEditor.getText());
 		if(toolChainCombo.getSelectionIndex() < 0) {
 			MessageBox box = new MessageBox(PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell(), SWT.OK);
 			box.setText("EclipseCoder - C++ configuration");
@@ -161,9 +212,22 @@ public class CCPreferencesPage implements IWorkbenchPreferencePage {
 			box.open();
 			return false;
 		}
+		if(!configProjectCombo.getText().equals("") && !isValidConfigProject(configProjectCombo.getText())) {
+			MessageBox box = new MessageBox(PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell(), SWT.OK);
+			box.setText("EclipseCoder - C++ configuration");
+			box.setMessage("You need to specify a valid config source project or blank.");
+			box.open();
+			return false;
+		}
+		CCSupportPlugin.getInstance().getPreferenceStore().setValue(
+				CCSupportPlugin.CODE_TEMPLATE_PREFERENCE,
+				codeTemplateEditor.getText());
 		CCSupportPlugin.getInstance().getPreferenceStore().setValue(
 				CCSupportPlugin.TOOLCHAIN_PREFERENCE,
 				toolChainId.get(toolChainCombo.getSelectionIndex()));
+		CCSupportPlugin.getInstance().getPreferenceStore().setValue(
+				CCSupportPlugin.CONFIG_PROJECT_PREFERENCE,
+				configProjectCombo.getText());
 		return true;
 	}
 

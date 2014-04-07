@@ -25,6 +25,9 @@ import org.eclipse.cdt.managedbuilder.core.ManagedCProjectNature;
 import org.eclipse.cdt.ui.CUIPlugin;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IWorkspace;
+import org.eclipse.core.resources.IWorkspaceRoot;
+import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.Platform;
 
 /**
@@ -39,6 +42,25 @@ public class CCLanguageSupport extends LanguageSupport {
 
 	@Override
 	public IFile createLanguageProject(IProject project) throws Exception {
+		// Get configuration from the specified project if any
+		IConfiguration parentConfig_ = null;
+		IWorkspace workspace = ResourcesPlugin.getWorkspace();
+		IWorkspaceRoot root = workspace.getRoot();
+		String configProjectName = CCSupportPlugin.getInstance().getConfigProject();
+		try {
+			if(!configProjectName.equals("")) {
+				IProject configProject = root.getProject(configProjectName);
+				if(!configProject.isOpen()) configProject.open(null);
+				IConfiguration ics[] = ManagedBuildManager.getBuildInfo(configProject).getManagedProject().getConfigurations();
+				for(IConfiguration ic : ics) {
+					if(ic.getId().startsWith(CCSupportPlugin.getInstance().getToolchain())) {
+						parentConfig_ = ic;
+					}
+				}
+			}
+		} catch (Exception e) {
+		}
+
 		CCorePlugin corePlugin = CCorePlugin.getDefault();
 
 		final ICProject cProject = CoreModel.getDefault().create(project);
@@ -94,6 +116,7 @@ public class CCLanguageSupport extends LanguageSupport {
 
 		IManagedProject newManagedProject = ManagedBuildManager.createManagedProject(project, parentProjectType);
 
+		if (parentConfig_ != null) parentConfig = parentConfig_;
 		IConfiguration newConfig = newManagedProject.createConfiguration(parentConfig, parentConfig.getId() + "."
 				+ ManagedBuildManager.getRandomNumber());
 

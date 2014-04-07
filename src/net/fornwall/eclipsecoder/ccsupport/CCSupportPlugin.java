@@ -5,6 +5,7 @@ import org.eclipse.ui.plugin.AbstractUIPlugin;
 public class CCSupportPlugin extends AbstractUIPlugin {
     public static final String CODE_TEMPLATE_PREFERENCE = "codeTemplatePreference";
     public static final String TOOLCHAIN_PREFERENCE = "toolchainPreference";
+    public static final String CONFIG_PROJECT_PREFERENCE = "configProjectPreference";
 
     private static CCSupportPlugin instance;
 
@@ -23,6 +24,10 @@ public class CCSupportPlugin extends AbstractUIPlugin {
 
     public String getToolchain() {
         return getPreferenceStore().getString(TOOLCHAIN_PREFERENCE);
+    }
+
+    public String getConfigProject() {
+        return getPreferenceStore().getString(CONFIG_PROJECT_PREFERENCE);
     }
 
 }
